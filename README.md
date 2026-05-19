@@ -37,12 +37,12 @@ The generated HTML is fully self-contained (JS libraries are inlined) so it can 
 
 5. **Commit both the script and the generated HTML** so the dashboard is viewable directly in GitHub and ready to upload to Synapse.
 
-## Embedding on Synapse
+## Deploying to Synapse
 
-Upload `<name>_dashboard.html` to Synapse (as a file entity or wiki attachment), then embed it in a wiki page using an iframe widget:
+Upload `<name>_dashboard.html` to [syn74383538](https://www.synapse.org/Synapse:syn74383538) on Synapse, then embed it in the relevant wiki page using an iframe widget pointing at the file entity:
 
 ```
 ${preview?entityId=synXXXXXXX}
 ```
 
-or via the Synapse wiki HTML widget pointing at the file's raw URL.
+where `synXXXXXXX` is the Synapse ID assigned to the uploaded HTML file.
