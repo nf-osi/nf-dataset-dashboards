@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JHU NF1 Biospecimen Repository</title>
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Sans+3:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Surface palette */
+  --bg:      #f2f0eb;
+  --surface: #ffffff;
+  --deep:    #f8f6f2;
+  --panel:   #ffffff;
+  --rim:     #e0dbd2;
+  --rim2:    #ccc5b9;
+
+  /* Accent colors */
+  --glow-c: #1a5fd4;   /* cobalt blue  — WES */
+  --glow-v: #6d28d9;   /* violet       — stat/sex */
+  --glow-g: #047857;   /* emerald      — WGS */
+  --glow-o: #b45309;   /* amber        — RNA-seq */
+
+  /* Text */
+  --text:  #1c1917;
+  --muted: #78716c;
+  --sharp: #0c0a09;
+
+  /* Fonts */
+  --serif: 'Cormorant Garamond', Georgia, serif;
+  --mono:  'IBM Plex Mono', 'Courier New', monospace;
+  --sans:  'Source Sans 3', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: auto; }
+
+body {
+  background: var(--bg);
+  /* Subtle dot-grid baked into background — no fixed/pseudo elements to avoid iframe resize loops */
+  background-image: radial-gradient(circle, rgba(0,0,0,.09) 1px, transparent 1px);
+  background-size: 28px 28px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  overflow-x: hidden;
+}
+
+/* ── Header ──────────────────────────────────────── */
+header {
+  position: relative;
+  z-index: 1;
+  padding: 28px 40px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--rim);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  box-shadow: 0 1px 0 var(--rim), 0 2px 8px rgba(0,0,0,.04);
+}
+
+.header-left { flex: 1; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--glow-c);
+  margin-bottom: 8px;
+}
+
+header h1 {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 500;
+  color: var(--sharp);
+  line-height: 1.1;
+  letter-spacing: -.01em;
+}
+
+header h1 em {
+  font-style: italic;
+  color: var(--glow-c);
+}
+
+.header-meta {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.ds-tag {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  padding: 3px 10px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+.ds-tag.wes  { color: #1a5fd4; border-color: rgba(26,95,212,.3);  background: rgba(26,95,212,.06); }
+.ds-tag.rna  { color: #b45309; border-color: rgba(180,83,9,.3);   background: rgba(180,83,9,.06);  }
+.ds-tag.wgs  { color: #047857; border-color: rgba(4,120,87,.3);   background: rgba(4,120,87,.06);  }
+
+.header-right {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  text-align: right;
+  line-height: 1.8;
+  padding-top: 4px;
+}
+.header-right a { color: var(--glow-c); text-decoration: none; }
+
+/* ── Main ────────────────────────────────────────── */
+.main {
+  position: relative;
+  z-index: 1;
+  padding: 28px 40px;
+  max-width: 1700px;
+  margin: 0 auto;
+}
+
+/* ── Stat cards ─────────────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--rim);
+  border-radius: 8px;
+  padding: 22px 26px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s, transform .2s;
+  cursor: default;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,.09);
+}
+.stat::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 8px 8px 0 0;
+}
+.stat.c::before { background: linear-gradient(90deg, #1a5fd4, #60a5fa); }
+.stat.v::before { background: linear-gradient(90deg, #6d28d9, #a78bfa); }
+.stat.g::before { background: linear-gradient(90deg, #047857, #34d399); }
+
+.stat-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.stat-value {
+  font-family: var(--mono);
+  font-size: 52px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+.stat.c .stat-value { color: #1a5fd4; }
+.stat.v .stat-value { color: #6d28d9; }
+.stat.g .stat-value { color: #047857; }
+
+.stat-sub {
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .04em;
+}
+
+/* ── Layout rows ─────────────────────────────────── */
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.row1 { margin-bottom: 16px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--rim);
+  border-radius: 8px;
+  padding: 22px 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+
+.card-title {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--sharp);
+  margin-bottom: 3px;
+}
+.card-sub {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: .05em;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.chart-wrap { position: relative; }
+
+/* ── Legend ──────────────────────────────────────── */
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Divider ─────────────────────────────────────── */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(90deg, var(--glow-c), transparent);
+  opacity: .2;
+  margin-bottom: 20px;
+}
+
+/* ── Footer ──────────────────────────────────────── */
+footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 18px 40px;
+  background: var(--surface);
+  border-top: 1px solid var(--rim);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: .05em;
+  color: var(--muted);
+}
+footer a { color: var(--glow-c); text-decoration: none; }
+
+canvas { display: block; }
+.js-plotly-plot .plotly { background: transparent !important; }
+
+/* ── Dataset nav buttons ─────────────────────────── */
+.ds-nav { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.ds-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-decoration: none;
+  transition: background .15s, box-shadow .15s, transform .12s;
+  cursor: pointer;
+}
+.ds-btn:hover { transform: translateY(-1px); }
+.ds-btn.wes  { color: #1a5fd4; border-color: rgba(26,95,212,.3);  background: rgba(26,95,212,.06);  }
+.ds-btn.wes:hover  { background: rgba(26,95,212,.12); box-shadow: 0 2px 12px rgba(26,95,212,.15); }
+.ds-btn.rna  { color: #b45309; border-color: rgba(180,83,9,.3);   background: rgba(180,83,9,.06);   }
+.ds-btn.rna:hover  { background: rgba(180,83,9,.12);  box-shadow: 0 2px 12px rgba(180,83,9,.15);  }
+.ds-btn.wgs  { color: #047857; border-color: rgba(4,120,87,.3);   background: rgba(4,120,87,.06);   }
+.ds-btn.wgs:hover  { background: rgba(4,120,87,.12);  box-shadow: 0 2px 12px rgba(4,120,87,.15);  }
+.ds-btn .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.ds-btn.wes .dot { background: #1a5fd4; }
+.ds-btn.rna .dot { background: #b45309; }
+.ds-btn.wgs .dot { background: #047857; }
+
+/* ── Query builder ───────────────────────────────── */
+.qb-card {
+  background: var(--surface);
+  border: 1px solid var(--rim);
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  /* overflow must stay visible so dropdowns can escape the card */
+}
+.qb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid transparent;
+  transition: background .15s, border-color .15s;
+}
+.qb-header:hover { background: var(--deep); border-bottom-color: var(--rim); }
+.qb-header-left { display: flex; align-items: center; gap: 10px; }
+.qb-title {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--sharp);
+}
+.qb-sub {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: .05em;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.qb-toggle {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform .2s;
+}
+.qb-toggle.open { transform: rotate(180deg); }
+.qb-body {
+  display: none;
+  padding: 18px 22px 22px;
+  border-top: 1px solid var(--rim);
+  overflow: visible;
+}
+.qb-body.open { display: block; }
+.qb-fields {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.qb-field label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.qb-field select, .qb-field input {
+  width: 100%;
+  background: var(--deep);
+  border: 1px solid var(--rim);
+  border-radius: 5px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color .15s;
+  appearance: none;
+}
+.qb-field select:focus, .qb-field input:focus { border-color: rgba(26,95,212,.5); }
+.qb-field select option { background: var(--surface); color: var(--text); }
+
+/* Custom multi-select */
+.ms-wrap { position: relative; }
+.ms-trigger {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--deep); border: 1px solid var(--rim); border-radius: 5px;
+  padding: 7px 10px; cursor: pointer;
+  font-family: var(--mono); font-size: 11px; color: var(--text);
+  transition: border-color .15s; user-select: none;
+}
+.ms-trigger:hover, .ms-wrap.open .ms-trigger { border-color: rgba(26,95,212,.5); }
+.ms-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-label.has-sel { color: var(--glow-c); font-weight: 500; }
+.ms-arrow { font-size: 8px; color: var(--muted); margin-left: 6px; flex-shrink: 0; transition: transform .15s; }
+.ms-wrap.open .ms-arrow { transform: rotate(180deg); }
+.ms-dropdown {
+  display: none; position: absolute; top: calc(100% + 3px); left: 0; right: 0; z-index: 1000;
+  background: var(--surface); border: 1px solid rgba(26,95,212,.25); border-radius: 5px;
+  max-height: 180px; overflow-y: auto;
+  box-shadow: 0 6px 20px rgba(0,0,0,.12);
+}
+.ms-wrap.open .ms-dropdown { display: block; }
+.ms-opt {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 12px; cursor: pointer;
+  font-family: var(--mono); font-size: 10.5px; color: var(--text);
+  transition: background .1s;
+}
+.ms-opt:hover { background: var(--deep); }
+.ms-opt input[type="checkbox"] { accent-color: var(--glow-c); width: 12px; height: 12px; cursor: pointer; flex-shrink: 0; }
+.ms-opt.checked { color: var(--glow-c); }
+
+.qb-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.qb-sql-preview {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: #1a5fd4;
+  background: #eff4fd;
+  border: 1px solid rgba(26,95,212,.2);
+  border-radius: 5px;
+  padding: 8px 12px;
+  min-height: 36px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+}
+.qb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 5px;
+  border: none;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: opacity .15s, transform .12s;
+  white-space: nowrap;
+}
+.qb-btn:hover { opacity: .82; transform: translateY(-1px); }
+.qb-btn.primary {
+  background: rgba(26,95,212,.12);
+  color: #1a5fd4;
+  border: 1px solid rgba(26,95,212,.25);
+}
+.qb-btn.secondary {
+  background: var(--deep);
+  color: var(--text);
+  border: 1px solid var(--rim);
+}
+.qb-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rim);
+}
+.qb-ds-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 5px;
+  border: 1px solid;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background .15s;
+}
+.qb-ds-link.wes  { color: #1a5fd4; border-color: rgba(26,95,212,.3);  }
+.qb-ds-link.wes:hover  { background: rgba(26,95,212,.08);  }
+.qb-ds-link.rna  { color: #b45309; border-color: rgba(180,83,9,.3);   }
+.qb-ds-link.rna:hover  { background: rgba(180,83,9,.08);   }
+.qb-ds-link.wgs  { color: #047857; border-color: rgba(4,120,87,.3);   }
+.qb-ds-link.wgs:hover  { background: rgba(4,120,87,.08);   }
+.copied-msg { font-family: var(--mono); font-size: 10px; color: #047857; opacity: 0; transition: opacity .3s; }
+
+/* ── Count-up animation ──────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.stat { animation: fadeUp .5s ease both; }
+.stats-row .stat:nth-child(1) { animation-delay: .05s; }
+.stats-row .stat:nth-child(2) { animation-delay: .12s; }
+.stats-row .stat:nth-child(3) { animation-delay: .19s; }
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 1100px) {
+  .main { padding: 20px 24px; }
+  header { padding: 20px 24px 16px; }
+  .row3 { grid-template-columns: 1fr 1fr; }
+  .qb-fields { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 720px) {
+  header { flex-direction: column; gap: 12px; }
+  .header-right { align-self: flex-start; }
+  .main { padding: 16px; }
+  .stats-row { grid-template-columns: 1fr; }
+  .row3 { grid-template-columns: 1fr; }
+  .row2 { grid-template-columns: 1fr; }
+  .qb-fields { grid-template-columns: 1fr 1fr; }
+  .qb-links { flex-direction: column; }
+  header h1 { font-size: 24px; }
+}
+@media (max-width: 480px) {
+  .qb-fields { grid-template-columns: 1fr; }
+  .header-meta { gap: 6px; }
+  .ds-btn { font-size: 10px; padding: 7px 12px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="eyebrow">&#9632;&nbsp;&nbsp;Biospecimen Repository &middot; NF1 Cohort</div>
+    <h1>Johns Hopkins <em>NF1</em> Sequencing Dashboard</h1>
+    <div class="header-meta">
+      <a class="ds-btn wes" href="https://www.synapse.org/Synapse:syn74376449.4/datasets/" target="_blank"><span class="dot"></span>WES &middot; syn74376449 v4</a>
+      <a class="ds-btn rna" href="https://www.synapse.org/Synapse:syn74376463.2/datasets/" target="_blank"><span class="dot"></span>RNA-seq &middot; syn74376463 v2</a>
+      <a class="ds-btn wgs" href="https://www.synapse.org/Synapse:syn74376440.2/datasets/" target="_blank"><span class="dot"></span>WGS &middot; syn74376440 v2</a>
+    </div>
+  </div>
+  <div class="header-right">
+    <a href="https://www.synapse.org/Synapse:syn37919560">syn37919560</a> &middot; April 2026
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- Stat cards -->
+  <div class="stats-row">
+    <div class="stat c">
+      <div class="stat-label">Unique Study Participants</div>
+      <div class="stat-value" data-count="82">0</div>
+      <div class="stat-sub">Across WES &middot; RNA-seq &middot; WGS</div>
+    </div>
+    <div class="stat v">
+      <div class="stat-label">Unique Biospecimens</div>
+      <div class="stat-value" data-count="213">0</div>
+    </div>
+    <div class="stat g">
+      <div class="stat-label">Multi-Specimen Patients</div>
+      <div class="stat-value" data-count="68">0</div>
+      <div class="stat-sub">82.9% of all patients</div>
+    </div>
+  </div>
+
+  <!-- Query builder -->
+  <div class="qb-card">
+    <div class="qb-header" onclick="toggleQB()">
+      <div class="qb-header-left">
+        <div class="qb-title">Query Builder</div>
+        <span class="qb-sub">BUILD A FILTERED QUERY &amp; OPEN IN SYNAPSE</span>
+      </div>
+      <span class="qb-toggle" id="qbToggle">&#9660;</span>
+    </div>
+    <div class="qb-body" id="qbBody">
+      <div class="qb-fields">
+        <div class="qb-field">
+          <label>Dataset</label>
+          <select id="qbDataset" onchange="updateQuery()" style="width:100%;background:var(--deep);border:1px solid var(--rim);border-radius:5px;color:var(--text);font-family:var(--mono);font-size:11px;padding:7px 10px;outline:none;appearance:none;">
+            <option value="syn74376449">WES (syn74376449)</option>
+            <option value="syn74376463">RNA-seq (syn74376463)</option>
+            <option value="syn74376440">WGS (syn74376440)</option>
+          </select>
+        </div>
+        <div class="qb-field">
+          <label>Sex</label>
+          <div class="ms-wrap" id="msSex">
+            <div class="ms-trigger" onclick="toggleMS('msSex')">
+              <span class="ms-label" id="msSexLabel">Any</span>
+              <span class="ms-arrow">&#9660;</span>
+            </div>
+            <div class="ms-dropdown">
+              <label class="ms-opt"><input type="checkbox" value="Male" onchange="msChanged('msSex')"> Male</label>
+              <label class="ms-opt"><input type="checkbox" value="Female" onchange="msChanged('msSex')"> Female</label>
+              <label class="ms-opt"><input type="checkbox" value="Unknown" onchange="msChanged('msSex')"> Unknown</label>
+            </div>
+          </div>
+        </div>
+        <div class="qb-field">
+          <label>Tumor Type</label>
+          <div class="ms-wrap" id="msTumor">
+            <div class="ms-trigger" onclick="toggleMS('msTumor')">
+              <span class="ms-label" id="msTumorLabel">Any</span>
+              <span class="ms-arrow">&#9660;</span>
+            </div>
+            <div class="ms-dropdown">
+              <label class="ms-opt"><input type="checkbox" value="Plexiform Neurofibroma" onchange="msChanged('msTumor')"> Plexiform Neurofibroma</label>
+              <label class="ms-opt"><input type="checkbox" value="Malignant Peripheral Nerve Sheath Tumor" onchange="msChanged('msTumor')"> MPNST</label>
+              <label class="ms-opt"><input type="checkbox" value="Cutaneous Neurofibroma" onchange="msChanged('msTumor')"> Cutaneous Neurofibroma</label>
+              <label class="ms-opt"><input type="checkbox" value="Diffuse Infiltrating Neurofibroma" onchange="msChanged('msTumor')"> Diffuse Infiltrating NF</label>
+              <label class="ms-opt"><input type="checkbox" value="Atypical Neurofibroma" onchange="msChanged('msTumor')"> Atypical Neurofibroma</label>
+              <label class="ms-opt"><input type="checkbox" value="Nodular Neurofibroma" onchange="msChanged('msTumor')"> Nodular Neurofibroma</label>
+              <label class="ms-opt"><input type="checkbox" value="Neurofibroma" onchange="msChanged('msTumor')"> Neurofibroma</label>
+              <label class="ms-opt"><input type="checkbox" value="Not Applicable" onchange="msChanged('msTumor')"> Not Applicable</label>
+            </div>
+          </div>
+        </div>
+        <div class="qb-field">
+          <label>Tissue</label>
+          <div class="ms-wrap" id="msTissue">
+            <div class="ms-trigger" onclick="toggleMS('msTissue')" id="msTissueTrigger">
+              <span class="ms-label" id="msTissueLabel">Any</span>
+              <span class="ms-arrow">&#9660;</span>
+            </div>
+            <div class="ms-dropdown">
+              <label class="ms-opt"><input type="checkbox" value="primary tumor" onchange="msChanged('msTissue')"> Primary Tumor</label>
+              <label class="ms-opt"><input type="checkbox" value="blood" onchange="msChanged('msTissue')"> Blood</label>
+              <label class="ms-opt"><input type="checkbox" value="recurrent tumor" onchange="msChanged('msTissue')"> Recurrent Tumor</label>
+              <label class="ms-opt"><input type="checkbox" value="cell line" onchange="msChanged('msTissue')"> Cell Line</label>
+              <label class="ms-opt"><input type="checkbox" value="normal tissue" onchange="msChanged('msTissue')"> Normal Tissue</label>
+              <label class="ms-opt"><input type="checkbox" value="xenograft passage" onchange="msChanged('msTissue')"> Xenograft</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="qb-actions">
+        <div class="qb-sql-preview" id="qbSql">SELECT * FROM syn74376449.2</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="qb-btn secondary" onclick="copySQL()">&#9112; Copy SQL</button>
+          <span class="copied-msg" id="copiedMsg">Copied!</span>
+        </div>
+      </div>
+      <div class="qb-links" id="qbLinks">
+        <a class="qb-ds-link wes" id="linkWES" href="#" onclick="openDS(event,'syn74376449')">&#8599; Open WES</a>
+        <a class="qb-ds-link rna" id="linkRNA" href="#" onclick="openDS(event,'syn74376463')">&#8599; Open RNA-seq</a>
+        <a class="qb-ds-link wgs" id="linkWGS" href="#" onclick="openDS(event,'syn74376440')">&#8599; Open WGS</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 1: Coverage | Sex | Age -->
+  <div class="row3">
+    <div class="card">
+      <div class="card-title">Dataset Coverage</div>
+      <div class="card-sub">BIOSPECIMENS &amp; PARTICIPANTS PER ASSAY</div>
+      <div class="chart-wrap"><canvas id="modalityChart" height="200"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Sex Distribution</div>
+      <div class="card-sub">PARTICIPANT-LEVEL &middot; 82 TOTAL</div>
+      <div class="chart-wrap"><canvas id="sexChart" height="200"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Age at Diagnosis</div>
+      <div class="card-sub">72 PARTICIPANTS WITH KNOWN AGE</div>
+      <div class="chart-wrap"><canvas id="ageChart" height="200"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 2: Tumor × Dataset | Sample Type × Dataset -->
+  <div class="row2">
+    <div class="card">
+      <div class="card-title">Tumor Type <span style="font-style:italic;color:var(--glow-c);">&times;</span> Dataset</div>
+      <div class="card-sub">SPECIMENS PER TUMOR TYPE AND ASSAY</div>
+      <div class="chart-wrap" style="position:relative;height:300px;">
+        <canvas id="tumorModalityChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Sample Type <span style="font-style:italic;color:var(--glow-c);">&times;</span> Dataset</div>
+      <div class="card-sub">SPECIMENS PER TISSUE TYPE AND ASSAY</div>
+      <div class="chart-wrap" style="position:relative;height:300px;">
+        <canvas id="tissueModalityChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 3: Multi-specimen sunburst -->
+  <div class="row1">
+    <div class="card">
+      <div class="card-title">Multi-Specimen Patient Map</div>
+      <div class="card-sub">68 PARTICIPANTS WITH &gt;1 BIOSPECIMEN &middot; COLOR = ASSAY &middot; SYMBOL = TUMOR TYPE &middot; CLICK A PATIENT TO EXPAND</div>
+      <div id="sunburstChart" style="height:540px;"></div>
+      <div class="legend" id="sunburstLegend"></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <a href="https://www.synapse.org/Synapse:syn74376449.4/datasets/">syn74376449</a> (WES v4) &nbsp;&bull;&nbsp;
+  <a href="https://www.synapse.org/Synapse:syn74376463.2/datasets/">syn74376463</a> (RNA-seq v2) &nbsp;&bull;&nbsp;
+  <a href="https://www.synapse.org/Synapse:syn74376440.2/datasets/">syn74376440</a> (WGS v2) &nbsp;&bull;&nbsp;
+  Johns Hopkins NF1 Biospecimen Repository
+</footer>
+
+<script>
+const DATA = {{DATA}};
+const TC = DATA.tumor_colors;
+
+/* ── Shared constants ─────────────────────────────── */
+const DS = ['WES', 'RNA-seq', 'WGS'];
+const DS_COLORS = DATA.ds_colors;
+
+/* Light-theme chart defaults */
+const GRID  = 'rgba(0,0,0,.07)';
+const TICK  = '#78716c';
+const LGND  = '#57534e';
+
+/* ── Count-up animation ───────────────────────────── */
+document.querySelectorAll('.stat-value[data-count]').forEach(el => {
+  const target = +el.dataset.count;
+  const dur = 900;
+  const start = performance.now();
+  (function tick(now) {
+    const p = Math.min((now - start) / dur, 1);
+    const ease = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(ease * target);
+    if (p < 1) requestAnimationFrame(tick);
+  })(start);
+});
+
+/* ── Dataset Coverage ───────────────────────────── */
+new Chart(document.getElementById('modalityChart'), {
+  type: 'bar',
+  data: {
+    labels: DS,
+    datasets: [
+      {
+        label: 'Biospecimens',
+        data: DS.map(d => DATA.specs_by_ds[d] || 0),
+        backgroundColor: ['rgba(26,95,212,.75)', 'rgba(180,83,9,.75)', 'rgba(4,120,87,.75)'],
+        borderRadius: 4
+      },
+      {
+        label: 'Participants',
+        data: DS.map(d => DATA.pats_by_ds[d] || 0),
+        backgroundColor: ['rgba(26,95,212,.25)', 'rgba(180,83,9,.25)', 'rgba(4,120,87,.25)'],
+        borderRadius: 4
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 10, padding: 14, color: LGND } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y}` } }
+    },
+    scales: {
+      x: { grid: { color: GRID }, ticks: { color: TICK } },
+      y: { grid: { color: GRID }, ticks: { color: TICK }, beginAtZero: true }
+    }
+  }
+});
+
+/* ── Sex ────────────────────────────────────────── */
+const sexKeys = Object.keys(DATA.sex_patients);
+new Chart(document.getElementById('sexChart'), {
+  type: 'doughnut',
+  data: {
+    labels: sexKeys,
+    datasets: [{
+      data: sexKeys.map(k => DATA.sex_patients[k]),
+      backgroundColor: ['#6d28d9', '#db2777', '#94a3b8'],
+      borderColor: '#ffffff',
+      borderWidth: 3,
+      hoverOffset: 6
+    }]
+  },
+  options: {
+    responsive: true, cutout: '66%',
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, color: LGND } },
+      tooltip: { callbacks: { label: ctx => {
+        const t = ctx.dataset.data.reduce((a, b) => a + b, 0);
+        return ` ${ctx.label}: ${ctx.parsed} (${(ctx.parsed / t * 100).toFixed(1)}%)`;
+      }}}
+    }
+  }
+});
+
+/* ── Age ────────────────────────────────────────── */
+new Chart(document.getElementById('ageChart'), {
+  type: 'bar',
+  data: {
+    labels: Object.keys(DATA.age_dist),
+    datasets: [{
+      data: Object.values(DATA.age_dist),
+      backgroundColor: ctx => {
+        const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 160);
+        g.addColorStop(0, 'rgba(26,95,212,.80)');
+        g.addColorStop(1, 'rgba(26,95,212,.18)');
+        return g;
+      },
+      borderRadius: 4
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.parsed.y} patients` } }
+    },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: TICK } },
+      y: { grid: { color: GRID }, ticks: { color: TICK, stepSize: 4 }, beginAtZero: true }
+    }
+  }
+});
+
+/* ── Tumor × Dataset ────────────────────────────── */
+const tm = DATA.tumor_modality;
+const TO = DATA.tumor_order;
+new Chart(document.getElementById('tumorModalityChart'), {
+  type: 'bar',
+  data: {
+    labels: TO.map(t => t.length > 26 ? t.slice(0, 26) + '…' : t),
+    datasets: DS.map(ds => ({
+      label: ds,
+      data: TO.map(t => (tm[ds] && tm[ds][t]) || 0),
+      backgroundColor: (DS_COLORS[ds] || '#aaa') + 'bb',
+      borderRadius: 3
+    }))
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, color: LGND } },
+      tooltip: { callbacks: {
+        label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x}`,
+        title: tts => TO[tts[0].dataIndex]
+      }}
+    },
+    scales: {
+      x: { stacked: true, grid: { color: GRID }, ticks: { color: TICK }, beginAtZero: true },
+      y: { stacked: true, grid: { display: false }, ticks: { color: TICK, font: { size: 11 } } }
+    }
+  }
+});
+
+/* ── Sample Type × Dataset ──────────────────────── */
+const tiss = DATA.tissue_modality;
+const TO2  = DATA.tissue_order;
+new Chart(document.getElementById('tissueModalityChart'), {
+  type: 'bar',
+  data: {
+    labels: TO2.map(t => t.length > 22 ? t.slice(0, 22) + '…' : t),
+    datasets: DS.map(ds => ({
+      label: ds,
+      data: TO2.map(t => (tiss[ds] && tiss[ds][t]) || 0),
+      backgroundColor: (DS_COLORS[ds] || '#aaa') + 'bb',
+      borderRadius: 3
+    }))
+  },
+  options: {
+    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, color: LGND } },
+      tooltip: { callbacks: {
+        label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x}`,
+        title: tts => TO2[tts[0].dataIndex]
+      }}
+    },
+    scales: {
+      x: { stacked: true, grid: { color: GRID }, ticks: { color: TICK }, beginAtZero: true },
+      y: { stacked: true, grid: { display: false }, ticks: { color: TICK, font: { size: 11 } } }
+    }
+  }
+});
+
+/* ── Sunburst ────────────────────────────────────── */
+const sb = DATA.sunburst;
+
+Plotly.newPlot('sunburstChart', [{
+  type: 'sunburst',
+  ids: sb.ids, labels: sb.labels, parents: sb.parents, values: sb.values,
+  branchvalues: 'remainder',
+  marker: { colors: sb.colors, line: { width: 1.5, color: '#ffffff' } },
+  hovertemplate: '<b>%{label}</b><extra></extra>',
+  leaf: { opacity: 0.92 },
+  textfont: { size: 10, family: "'IBM Plex Mono', monospace" },
+  insidetextorientation: 'radial',
+  maxdepth: 2,
+}], {
+  paper_bgcolor: 'rgba(0,0,0,0)',
+  plot_bgcolor: 'rgba(0,0,0,0)',
+  margin: { l: 10, r: 10, t: 10, b: 10 },
+  font: { color: '#57534e', family: "'IBM Plex Mono', monospace" }
+}, { responsive: false, displayModeBar: false });
+
+/* ── Sunburst legend ──────────────────────────────── */
+const legendEl = document.getElementById('sunburstLegend');
+const dsSection = document.createElement('div');
+dsSection.style.cssText = 'display:flex;gap:6px 20px;flex-wrap:wrap;padding-right:20px;border-right:1px solid var(--rim);';
+Object.entries(DATA.ds_colors).forEach(([name, color]) => {
+  const el = document.createElement('div');
+  el.className = 'legend-item';
+  el.innerHTML = `<span class="legend-dot" style="background:${color}cc;border-radius:2px;"></span>${name}`;
+  dsSection.appendChild(el);
+});
+legendEl.appendChild(dsSection);
+
+const tumorSymMap = [
+  ['◎','Plexiform Neurofibroma'], ['▲','MPNST'], ['○','Cutaneous Neurofibroma'],
+  ['≋','Diffuse Infiltrating NF'], ['△','Atypical Neurofibroma'], ['●','Nodular Neurofibroma'],
+  ['◦','Neurofibroma'], ['□','Localized Neurofibroma'], ['◆','Blood'], ['·','Not Applicable / Unknown']
+];
+const tsSection = document.createElement('div');
+tsSection.style.cssText = 'display:flex;gap:6px 20px;flex-wrap:wrap;';
+tumorSymMap.forEach(([sym, name]) => {
+  const el = document.createElement('div');
+  el.className = 'legend-item';
+  el.innerHTML = `<span style="font-family:var(--mono);font-size:13px;line-height:1;color:var(--text);width:16px;text-align:center;display:inline-block;">${sym}</span>${name}`;
+  tsSection.appendChild(el);
+});
+legendEl.appendChild(tsSection);
+
+/* ── Query Builder ───────────────────────────────── */
+function toggleQB() {
+  const body   = document.getElementById('qbBody');
+  const toggle = document.getElementById('qbToggle');
+  const isOpen = body.classList.toggle('open');
+  toggle.classList.toggle('open', isOpen);
+  if (isOpen) updateQuery();
+}
+
+const DS_NO_TISSUE = new Set(['syn74376440']);
+const DS_LABELS = { 'syn74376449': 'WES', 'syn74376463': 'RNA-seq', 'syn74376440': 'WGS' };
+const DS_VERSIONS = { 'syn74376449': 'syn74376449.4', 'syn74376463': 'syn74376463.2', 'syn74376440': 'syn74376440.2' };
+
+function toggleMS(id) {
+  const wrap = document.getElementById(id);
+  const wasOpen = wrap.classList.contains('open');
+  document.querySelectorAll('.ms-wrap.open').forEach(w => w.classList.remove('open'));
+  if (!wasOpen) wrap.classList.add('open');
+}
+
+function msChanged(id) {
+  const wrap    = document.getElementById(id);
+  const checked = Array.from(wrap.querySelectorAll('input:checked'));
+  const labelEl = document.getElementById(id + 'Label');
+  if (checked.length === 0) {
+    labelEl.textContent = 'Any';
+    labelEl.classList.remove('has-sel');
+  } else {
+    labelEl.textContent = checked.map(c => c.closest('.ms-opt').textContent.trim()).join(', ');
+    labelEl.classList.add('has-sel');
+  }
+  wrap.querySelectorAll('.ms-opt').forEach(opt => {
+    opt.classList.toggle('checked', opt.querySelector('input').checked);
+  });
+  updateQuery();
+}
+
+function getMS(id) {
+  return Array.from(document.querySelectorAll(`#${id} input:checked`)).map(c => c.value);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ms-wrap')) {
+    document.querySelectorAll('.ms-wrap.open').forEach(w => w.classList.remove('open'));
+  }
+});
+
+function buildSQL() {
+  const dsId    = document.getElementById('qbDataset').value;
+  const vId     = DS_VERSIONS[dsId] || dsId;
+  const sexes   = getMS('msSex');
+  const tumors  = getMS('msTumor');
+  const tissues = getMS('msTissue');
+  const clauses = [];
+
+  if (sexes.length === 1)       clauses.push(`sex = '${sexes[0]}'`);
+  else if (sexes.length > 1)    clauses.push(`sex IN (${sexes.map(s => `'${s}'`).join(', ')})`);
+
+  if (tumors.length === 1)      clauses.push(`HAS(tumorType, '${tumors[0]}')`);
+  else if (tumors.length > 1)   clauses.push(`(${tumors.map(t => `HAS(tumorType, '${t}')`).join(' OR ')})`);
+
+  if (!DS_NO_TISSUE.has(dsId)) {
+    if (tissues.length === 1)    clauses.push(`tissue = '${tissues[0]}'`);
+    else if (tissues.length > 1) clauses.push(`tissue IN (${tissues.map(t => `'${t}'`).join(', ')})`);
+  }
+
+  let sql = `SELECT * FROM ${vId}`;
+  if (clauses.length) sql += ' WHERE ' + clauses.join(' AND ');
+  return sql;
+}
+
+function buildSynapseURL(synId) {
+  const sexes    = getMS('msSex');
+  const tumors   = getMS('msTumor');
+  const tissues  = getMS('msTissue');
+  const noTissue = DS_NO_TISSUE.has(synId);
+  const vId      = DS_VERSIONS[synId];
+  const selectedFacets = [];
+
+  if (sexes.length) selectedFacets.push({
+    concreteType: 'org.sagebionetworks.repo.model.table.FacetColumnValuesRequest',
+    columnName: 'sex', facetValues: sexes
+  });
+  if (tumors.length) selectedFacets.push({
+    concreteType: 'org.sagebionetworks.repo.model.table.FacetColumnValuesRequest',
+    columnName: 'tumorType', facetValues: tumors
+  });
+  if (tissues.length && !noTissue) selectedFacets.push({
+    concreteType: 'org.sagebionetworks.repo.model.table.FacetColumnValuesRequest',
+    columnName: 'tissue', facetValues: tissues
+  });
+  const query = { sql: `SELECT * FROM ${vId}` };
+  if (selectedFacets.length) query.selectedFacets = selectedFacets;
+  query.includeEntityEtag = true;
+  query.limit = 25;
+
+  return `https://www.synapse.org/Synapse:${vId}/datasets/#query/${btoa(unescape(encodeURIComponent(JSON.stringify(query))))}`;
+}
+
+function openDS(e, synId) {
+  e.preventDefault();
+  window.open(buildSynapseURL(synId), '_blank');
+}
+
+function updateQuery() {
+  const dsId = document.getElementById('qbDataset').value;
+  document.getElementById('qbSql').textContent = buildSQL();
+
+  const tissueTrigger = document.getElementById('msTissueTrigger');
+  const tissueWrap    = document.getElementById('msTissue');
+  const noTissue      = DS_NO_TISSUE.has(dsId);
+  tissueTrigger.style.opacity       = noTissue ? '0.35' : '1';
+  tissueTrigger.style.pointerEvents = noTissue ? 'none'  : '';
+  if (noTissue) {
+    tissueWrap.querySelectorAll('input').forEach(i => { i.checked = false; });
+    document.getElementById('msTissueLabel').textContent = 'Any';
+    document.getElementById('msTissueLabel').classList.remove('has-sel');
+  }
+
+  const links = { 'syn74376449': 'linkWES', 'syn74376463': 'linkRNA', 'syn74376440': 'linkWGS' };
+  Object.entries(links).forEach(([id, elId]) => {
+    const el = document.getElementById(elId);
+    el.style.opacity    = id === dsId ? '1'   : '0.4';
+    el.style.fontWeight = id === dsId ? '700' : '600';
+  });
+}
+
+function copySQL() {
+  navigator.clipboard.writeText(buildSQL()).then(() => {
+    const msg = document.getElementById('copiedMsg');
+    msg.style.opacity = '1';
+    setTimeout(() => { msg.style.opacity = '0'; }, 1800);
+  });
+}
+
+updateQuery();
+</script>
+</body>
+</html>
